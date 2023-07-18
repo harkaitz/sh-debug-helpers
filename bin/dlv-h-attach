@@ -1,0 +1,24 @@
+#!/bin/sh -e
+##:
+#h: Usage: dlv-h-attach
+#h:
+#h: Attach to a running "dlv-h-ssh". You can use "dlv" from GNU Emacs.
+#h: Put commands like "break main.CreateWebsite" in "DEBUG.dlv".
+##:
+dlv_h_attach() {
+    local ifile= i=
+    for i in DEBUG.dlv ../DEBUG.dlv ../../DEBUG.dlv; do
+        if test -e "${i}"; then
+            ifile="${i}"
+            break
+        fi
+    done
+    echo dlv connect 127.0.0.1:9666 ${ifile:+ --init "${ifile}" } >&2
+         dlv connect 127.0.0.1:9666 ${ifile:+ --init "${ifile}" }
+}
+if test @"$(basename "$0")" = @"dlv-h-attach";then
+    case "${1}" in
+        -h|--help) sed -n 's/^ *#h: \{0,1\}//p' "$0" ;;
+        *)         dlv_h_attach "$@"; exit 0;;
+    esac
+fi

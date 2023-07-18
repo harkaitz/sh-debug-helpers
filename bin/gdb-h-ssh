@@ -1,0 +1,83 @@
+#!/bin/sh -e
+##:
+#h: Usage: gdb-h-ssh -e | SSH PROGRAM
+#h:
+#h: Connect to SSH server, search a running process with PROGRAM
+#h: absolute pathname, and bind to it with gdbserver. You can then
+#h: connect throw 127.0.0.1:9666 .
+#h:
+#h:   -e : Execute `gdb -ex "target remote 127.0.0.1:9666" -i=mi`.
+#h:   -t : Execute `gdb -ex "target remote 127.0.0.1:9666"`.
+##:
+gdb_h_ssh() {
+    local OPTIND optopt ssh exe port="9666" opt_e='' opt_t=''
+    ## Parse command line arguments.
+    while getopts "et" optopt; do
+        case $optopt in
+            e)  opt_e=y;;
+            t)  opt_t=y;;
+            \?) return 1;;
+        esac
+    done
+    shift $(( $OPTIND - 1 ))
+    ## Connect with GDB.
+    if test -n "${opt_e}"; then
+        gdb -ex 'target remote 127.0.0.1:9666' -i=mi "$@"
+        return 0
+    elif test -n "${opt_t}"; then
+        gdb -ex 'target remote 127.0.0.1:9666' "$@"
+        return 0
+    fi
+    ## Execute the GDB service.
+    ssh="$1" exe="$2"
+    if test ! -n "${ssh}"; then
+        echo >&2 "error: Please specify a machine name."
+        return 1
+    elif test ! -n "${exe}"; then
+        echo >&2 "error: Please specify an executable name."
+        return 1
+    fi
+    shift 2
+    ssh -t -L "127.0.0.1:${port}:127.0.0.1:${port}" "${ssh}" "
+    set -e
+    ssh='${ssh}'
+    exe='${exe}'
+    port='${port}'
+    "'
+    
+    exe="$(which "${exe}" 2>/dev/null || true)"
+    if test ! -e "${exe}"; then
+        echo >&2 "error: The executable "${exe}" does not exist."
+        exit 1
+    fi
+    
+    if which gdbserver >/dev/null 2>&1; then
+        true
+    elif test -e /usr/bin/apt-get; then
+        sudo apt-get -y install gdbserver >&2
+    elif test -e /usr/bin/xbps-install; then
+        sudo xbps-install -Rs gdb
+    else
+        echo >&2 "error: Please install gdbserver in \"${ssh}\" to continue."
+        exit 1
+    fi
+    
+    for lnk in $(sudo find /proc -maxdepth 2 -mindepth 2 -iname exe); do
+        if test @"${exe}" = @"$(readlink -f "${lnk}")"; then
+            pid="$(dirname "${lnk}" | xargs basename)"
+            break
+        fi
+    done
+
+    echo sudo gdbserver --attach "127.0.0.1:${port}" "${pid}" >&2
+    sudo gdbserver --attach "127.0.0.1:${port}" "${pid}"
+
+    '
+    
+}
+if test @"$(basename "$0")" = @"gdb-h-ssh";then
+    case "${1}" in
+        ''|-h|--help) sed -n 's/^ *#h: \{0,1\}//p' "$0" ;;
+        *)            gdb_h_ssh "$@"; exit 0 ;;
+    esac
+fi

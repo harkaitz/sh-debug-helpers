@@ -1,0 +1,83 @@
+#!/bin/sh -e
+##:
+#h: Usage: dlv-h-ssh [-i] SSH [PROGRAM-REGEX]
+#h:
+#h: Connect to SSH server and attach to a PROGRAM's running process.
+##:
+dlv_h_ssh() {
+    local OPTIND optopt opt_i= ssh= exe= dlv=
+    ## Parse command line arguments.
+    while getopts "i" optopt; do
+        case $optopt in
+            i)  opt_i=y;;
+            \?) return 1;;
+        esac
+    done
+    shift $(( $OPTIND - 1 ))
+    ## Get hostname.
+    ssh="$1"
+    if test ! -n "${ssh}"; then
+        echo >&2 "error: Please specify a machine name."
+        return 1
+    fi
+    shift
+    ## Install dlv in remote machine.
+    if test -n "${opt_i}"; then
+        dlv="$(which dlv 2>/dev/null || true)"
+        if test ! -n "${dlv}"; then
+            echo >&2 "error: Please install dlv locally."
+            return 1
+        fi
+        ssh "${ssh}" '
+            echo "Uploading ~/.local/bin/dlv ..."
+            mkdir -p ~/.local/bin
+            cat > ~/.local/bin/dlv
+            chmod +x ~/.local/bin/dlv
+            ' < "${dlv}"
+        if test ! -n "${exe}"; then
+            return 0
+        fi
+    fi
+    ## Get executable regex.
+    exe="$1"
+    if test ! -n "${exe}"; then
+        echo >&2 "error: Please specify an executable name."
+        return 1
+    fi
+    shift
+    ## Upload dlv to the remote machine.
+    ssh -t -L 127.0.0.1:9666:127.0.0.1:9666 "${ssh}" "
+    set -e
+    exe='${exe}'
+    pid=''
+    "'
+    export PATH="${PATH}:${HOME}/.local/bin"
+
+    if ! which dlv >/dev/null 2>&1; then
+        echo >&2 "error: Please install dlv."
+        exit 1
+    fi
+
+    for lnk in $(sudo find /proc -maxdepth 2 -mindepth 2 -iname exe); do
+        if test -n "$(readlink -f "${lnk}" | grep "${exe}")"; then
+            pid="$(dirname "${lnk}" | xargs basename)"
+            break
+        fi
+    done
+
+    if test ! -n "${pid}"; then
+        echo >&2 "error: Cannot find the executable: ${exe}"
+        exit 1
+    fi
+
+    echo >&2 dlv -r attach "${pid}"
+    dlv attach "${pid}" --continue --accept-multiclient --listen 127.0.0.1:9666 --headless
+    '
+    
+}
+if test @"$(basename "$0")" = @"dlv-h-ssh";then
+    case "${1}" in
+        ''|-h|--help) sed -n 's/^ *#h: \{0,1\}//p' "$0";;
+        *)            dlv_h_ssh "$@"; exit 0;;
+    esac
+fi

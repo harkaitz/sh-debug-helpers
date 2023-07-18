@@ -1,0 +1,77 @@
+#!/bin/sh -e
+##:
+#h: Usage: ltest-c
+#h:
+#h: ... b-gcc : Build program using GCC.
+#h: ... r-gcc : Run program using GCC.
+#h:
+#h: ... u-ssh SSH : Copy to server and execute.
+##:
+ltest_c() {
+    local cmd="$1"
+    shift
+    case "${cmd}" in
+        b-gcc) ltest_c_build_gcc       ;;
+        r-gcc) ltest_c_run_gcc         ;;
+        u-ssh) ltest_c_ssh_upload "$@" ;;
+        *)     echo >&2 "error: Invalid argument: ${cmd}"; return 1;;
+    esac
+}
+## -------------------------------------------------------------------
+
+ltest_c_build_gcc() {
+    local srcdir="$(ltest_c_srcdir_clean)" pwd="$(pwd)"; test -n "${srcdir}"
+    cd "${srcdir}"
+    vrun gcc -g -pg --coverage -fprofile-abs-path -o ./example.run example.c
+    cd "${pwd}"
+}
+ltest_c_run_gcc() {
+    local srcdir="$(ltest_c_srcdir_built)" pwd="$(pwd)"; test -n "${srcdir}"
+    cd "${srcdir}"
+    vrun ./example.run
+    cd "${pwd}"
+}
+ltest_c_ssh_upload() {
+    local srcdir="$(ltest_c_srcdir_built)" pwd="$(pwd)" a; test -n "${srcdir}"
+    cd "${srcdir}"
+    for a in "$@"; do
+        vrun scp ./example.run "$a":/tmp/example.run
+        vrun ssh "${a}" /tmp/example.run
+    done
+    cd "${pwd}"
+}
+
+## -------------------------------------------------------------------
+ltest_c_srcdir_built() {
+    local srcdir="${HOME}/.local/src/ltest"
+    if test ! -e "${srcdir}/example.run"; then
+        echo >&2 "error: Not built."
+        return 1
+    fi
+    echo "${srcdir}"
+}
+ltest_c_srcdir_clean() {
+    local srcdir="${HOME}/.local/src/ltest"
+    mkdir -p "${srcdir}"
+    rm -rf "${srcdir}"/*
+    cat > "${srcdir}/example.c" <<-EOF
+	#include <stdio.h>
+	void hello(void) {
+	  printf("Hello world.\\n");
+	}
+	int main (int _argc, char *_argv) {
+	  hello();
+	  getc(stdin);
+	  hello();
+	}
+	EOF
+    echo "${srcdir}"
+}
+vrun() { echo "$*"; "$@"; }
+## -------------------------------------------------------------------
+if test @"$(basename "$0")" = @"ltest-c";then
+    case "${1}" in
+        ''|-h|--help) sed -n 's/^ *#h: \{0,1\}//p' "$0" ;;
+        *)            ltest_c "$@"; exit 0;;
+    esac
+fi
