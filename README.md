@@ -28,15 +28,6 @@ gdb-h-ssh
       -e : Execute `gdb -ex "target remote 127.0.0.1:9666" -i=mi`.
       -t : Execute `gdb -ex "target remote 127.0.0.1:9666"`.
 
-ltest-c
-
-    Usage: ltest-c
-    
-    ... b-gcc : Build program using GCC.
-    ... r-gcc : Run program using GCC.
-    
-    ... u-ssh SSH : Copy to server and execute.
-
 ## Collaborating
 
 For making bug reports, feature requests and donations visit
