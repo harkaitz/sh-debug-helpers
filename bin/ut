@@ -1,0 +1,72 @@
+#!/bin/sh -e
+##:
+#h: Usage: ut ...
+#h:
+#h: Unitary test manager.
+#h:
+#h:   File: UT.lst : NAME BINARY DIRECTORY
+#h:   File: UT.res : NAME {OK,OTHER} 
+#h:
+#h: Command line operations.
+#h:
+#h:   -l      : List unitary tests (from results).
+#h:   -lf     : List failing unitary tests.
+#h:   -d NAME : Execute unitary test with DDD.
+##:
+ut() {
+    local OPTIND optopt ops= ut=
+    
+    ## Parse command line arguments.
+    while getopts "lfd:" optopt; do
+        ops="${ops}${optopt}"
+        case $optopt in
+            d)  ut="${OPTARG}";;
+            \?) return 1;;
+        esac
+    done
+    shift $(( $OPTIND - 1 ))
+    
+    ## Operations.
+    case "${ops}" in
+        *lf*) ut_list_failing; return 0;;
+        *l*)  ut_list_all;     return 0;;
+        *d*)  ut_ddd "$ut";    return 0;;
+    esac
+}
+ut_list_all()     { test ! -f UT.res || cat UT.res; }
+ut_list_failing() { ut_list_all | sed '/ OK$/d';    }
+ut_ddd() {
+    local pwd="$(pwd)" name="$1" ign dir exe
+
+    if test ! -n "${name}"; then
+        echo >&2 "error: Please specify a test name."
+        return 1
+    elif test ! -e UT.lst; then
+        echo >&2 "error: File 'UT.lst' not found."
+        return 1
+    fi
+
+    read -r ign exe dir <<-EOF
+	$(awk -v n="${name}" '$1 ~ n {print}' UT.lst)
+	EOF
+
+    if test ! -n "${dir}"; then
+        echo >&2 "error: ${name}: Unitary test not found."
+        return 1
+    fi
+    case "${exe}" in /*) true;; *) exe="${pwd}/${exe}";; esac
+    case "${dir}" in /*) true;; *) dir="${pwd}/${dir}";; esac
+    
+    cd "${dir}"
+    ulimit -s $((20 * 1024))
+    export ASAN_OPTIONS="exitcode=0"
+    ddd --gdb "${exe}"
+    cd "${pwd}"
+}
+## -------------------------------------------------------------------
+if test @"$(basename "$0")" = @"ut";then
+    case "${1}" in
+        ''|-h|--help) sed -n 's/^ *#h: \{0,1\}//p' "$0" ;;
+        *)            ut "$@"; exit 0;;
+    esac
+fi

@@ -17,6 +17,12 @@ dlv-h-ssh
     
     Connect to SSH server and attach to a PROGRAM's running process.
 
+gdb-h-attach
+
+    Usage: gdb-h-attach PROGRAM-BASENAME
+    
+    Search program and attach to it with GDB.
+
 gdb-h-ssh
 
     Usage: gdb-h-ssh -e | SSH PROGRAM
@@ -27,6 +33,21 @@ gdb-h-ssh
     
       -e : Execute `gdb -ex "target remote 127.0.0.1:9666" -i=mi`.
       -t : Execute `gdb -ex "target remote 127.0.0.1:9666"`.
+
+ut
+
+    Usage: ut ...
+    
+    Unitary test manager.
+    
+      File: UT.lst : NAME BINARY DIRECTORY
+      File: UT.res : NAME {OK,OTHER} 
+    
+    Command line operations.
+    
+      -l      : List unitary tests (from results).
+      -lf     : List failing unitary tests.
+      -d NAME : Execute unitary test with DDD.
 
 ## Collaborating
 

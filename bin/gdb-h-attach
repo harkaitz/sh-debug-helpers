@@ -1,0 +1,27 @@
+#!/bin/sh -e
+##:
+#h: Usage: gdb-h-attach PROGRAM-BASENAME
+#h:
+#h: Search program and attach to it with GDB.
+gdb_h_attach() {
+    local basename binary pid
+
+    basename="$(basename "$1")"
+    pid="$(pidof -o %PPID -s "${basename}")"
+    
+    if test ! -n "${pid}"; then
+        echo >&2 "error: ${program}: Not in execution."
+        return 1
+    fi
+    if test -e /proc; then
+        binary="$(readlink "/proc/${pid}/exe")"
+        test -n "${binary}"
+    fi
+    gdb -q --tui -ex "catch signal" -ex "continue" "${binary}" "${pid}"
+}
+if test @"$(basename "$0")" = @"gdb-h-attach";then
+    case "${1}" in
+        ''|-h|--help) sed -n 's/^ *#h: \{0,1\}//p' "$0" ;;
+        *)            gdb_h_attach "$@"; exit 0;;
+    esac
+fi
